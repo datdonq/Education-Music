@@ -1,0 +1,8 @@
+openai==1.55.3
+google-genai==1.47.0
+loguru==0.7.2
+python-dotenv==1.0.1
+requests>=2.31.0
+json-repair>=0.14.0
+Pillow>=10.4.0
+opencv-python-headless
