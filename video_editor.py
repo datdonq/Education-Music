@@ -180,6 +180,103 @@ def merge_audio_to_video(
     return output_path
 
 
+def add_background_audio_to_video(
+    video_path: str,
+    bg_audio_path: str,
+    output_path: str,
+    *,
+    bg_volume: float = 0.5,
+    main_volume: Optional[float] = None,
+    bg_offset_sec: float = 0.0,
+    loop_bg: bool = True,
+    reencode_video: bool = False,
+) -> str:
+    """
+    Thêm nhạc nền vào audio của video đầu vào và xuất ra video mới.
+
+    - `bg_volume`: hệ số âm lượng cho background (1.0 = 100%, mặc định 0.5 = 50%).
+    - `main_volume`: nếu cung cấp, hệ số âm lượng cho audio gốc của video.
+    - `bg_offset_sec`: trễ background so với audio gốc (giây, >= 0).
+    - `loop_bg`: lặp background để đủ dài theo audio gốc.
+    - `reencode_video`: nếu True sẽ tái mã hóa video (libx264). Mặc định copy stream hình ảnh.
+    """
+    _ensure_ffmpeg()
+    Path(Path(output_path).parent).mkdir(parents=True, exist_ok=True)
+
+    if bg_volume < 0:
+        raise ValueError("bg_volume phải >= 0")
+    if main_volume is not None and main_volume < 0:
+        raise ValueError("main_volume phải >= 0 nếu cung cấp")
+    if bg_offset_sec < 0:
+        raise ValueError("bg_offset_sec phải >= 0")
+
+    cmd: List[str] = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        video_path,
+    ]
+
+    if loop_bg:
+        cmd += ["-stream_loop", "-1"]
+    cmd += ["-i", bg_audio_path]
+
+    filter_steps: List[str] = []
+    main_label = "[0:a]"
+    bg_label = "[1:a]"
+
+    current_bg = bg_label
+    if bg_offset_sec and bg_offset_sec > 0:
+        delay_ms = int(bg_offset_sec * 1000)
+        filter_steps.append(f"{current_bg}adelay={delay_ms}|{delay_ms}[bg_del]")
+        current_bg = "[bg_del]"
+
+    if bg_volume != 1.0:
+        filter_steps.append(f"{current_bg}volume={bg_volume}[bg_vol]")
+        current_bg = "[bg_vol]"
+
+    current_main = main_label
+    if main_volume is not None and main_volume != 1.0:
+        filter_steps.append(f"{current_main}volume={main_volume}[main_vol]")
+        current_main = "[main_vol]"
+
+    filter_steps.append(
+        f"{current_main}{current_bg}amix=inputs=2:duration=first:dropout_transition=0[mix]"
+    )
+
+    filter_complex = ";".join(filter_steps)
+
+    cmd += [
+        "-filter_complex",
+        filter_complex,
+        "-map",
+        "0:v:0",
+        "-map",
+        "[mix]",
+    ]
+
+    if reencode_video:
+        cmd += [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+        ]
+    else:
+        cmd += ["-c:v", "copy"]
+
+    cmd += ["-c:a", "aac", "-b:a", "192k"]
+    cmd += ["-shortest", output_path]
+
+    completed = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if completed.returncode != 0:
+        raise RuntimeError(f"ffmpeg add_background_audio_to_video thất bại: {completed.stderr}")
+
+    return output_path
+
+
 def concat_videos(
     video_paths: Iterable[str],
     output_path: str,
@@ -275,7 +372,7 @@ def extract_last_frame_to_image(
     try:
         _ensure_ffmpeg()
     except Exception:
-        return _extract_last_frame_to_image_cv2(
+        return extract_last_frame_to_image_cv2(
             video_path,
             output_image_path,
             quality=quality,
@@ -309,7 +406,7 @@ def extract_last_frame_to_image(
     except Exception as err:
         # Fallback tiếp sang OpenCV nếu không lấy được duration/ffprobe lỗi
         try:
-            return _extract_last_frame_to_image_cv2(
+            return extract_last_frame_to_image_cv2(
                 video_path,
                 output_image_path,
                 quality=quality,
@@ -341,7 +438,7 @@ def extract_last_frame_to_image(
     if completed2.returncode != 0:
         # Thử OpenCV như là bước fallback cuối
         try:
-            return _extract_last_frame_to_image_cv2(
+            return extract_last_frame_to_image_cv2(
                 video_path,
                 output_image_path,
                 quality=quality,
@@ -358,3 +455,5 @@ def extract_last_frame_to_image(
 
 #concat_videos(video_paths = [f"outputs/videos/{index}.mp4" for index in range(6)], output_path = "outputs/videos/final.mp4")
 #extract_last_frame_to_image_cv2(video_path = "outputs/videos/veo_20251031_020031_0_audio.mp4", output_image_path = "outputs/images/last_frame.png")
+
+add_background_audio_to_video(video_path = "outputs/videos/veo2_2.mp4", bg_audio_path = "music.mp3", output_path = "outputs/videos/final_veo_2.mp4")
