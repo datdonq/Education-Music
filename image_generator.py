@@ -30,8 +30,7 @@ def generate_images(
     prompt: str,
     *,
     model: str = DEFAULT_IMAGE_MODEL,
-    output_dir: str = "outputs/images",
-    output_prefix: str = "image",
+    output_path: str = "outputs/images/image",
     api_key: Optional[str] = None,
     images_path: str = None,
 ) -> List[str]:
@@ -79,9 +78,12 @@ def generate_images(
             inline_data = part.inline_data
             data_buffer = inline_data.data
             ext = mimetypes.guess_extension(inline_data.mime_type) or ".png"
-            filename = f"{output_prefix}_{file_index}{ext}"
+            base = Path(output_path)
+            dir_path = base.parent if base.name else base
+            prefix = base.name or "image"
+            filename = f"{prefix}_{file_index}{ext}"
             file_index += 1
-            full_path = str(Path(output_dir) / filename)
+            full_path = str(dir_path / filename)
             _save_binary(full_path, data_buffer)
             saved_paths.append(full_path)
         else:
