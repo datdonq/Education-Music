@@ -456,4 +456,112 @@ def extract_last_frame_to_image(
 #concat_videos(video_paths = [f"outputs/videos/{index}.mp4" for index in range(6)], output_path = "outputs/videos/final.mp4")
 #extract_last_frame_to_image_cv2(video_path = "outputs/videos/veo_20251031_020031_0_audio.mp4", output_image_path = "outputs/images/last_frame.png")
 
-add_background_audio_to_video(video_path = "outputs/videos/veo2_2.mp4", bg_audio_path = "music.mp3", output_path = "outputs/videos/final_veo_2.mp4")
+#add_background_audio_to_video(video_path = "outputs/videos/veo2_2.mp4", bg_audio_path = "music.mp3", output_path = "outputs/videos/final_veo_2.mp4")
+
+
+def _format_srt_time(seconds: float) -> str:
+    total_ms = int(round(seconds * 1000))
+    hours = total_ms // (3600 * 1000)
+    remainder = total_ms % (3600 * 1000)
+    minutes = remainder // (60 * 1000)
+    remainder = remainder % (60 * 1000)
+    secs = remainder // 1000
+    ms = remainder % 1000
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{ms:03d}"
+
+
+def burn_subtitle_text(
+    video_path: str,
+    text: str,
+    output_path: str,
+    *,
+    position: str = "bottom",  # bottom | top | center
+    margin_y: int = 60,
+    font_name: Optional[str] = None,  # ví dụ: "DejaVu Sans"
+    font_size: int = 48,
+    box_opacity: float = 0.5,  # 0..1 (chỉ áp dụng khi BorderStyle=3)
+    reencode_preset: str = "veryfast",
+    crf: int = 18,
+) -> str:
+    """
+    Ghi (burn-in) một đoạn subtitle đơn (từ `text`) phủ lên toàn bộ thời lượng video.
+
+    - Dùng filter `subtitles` (libass) để hỗ trợ Unicode tốt, hạn chế lỗi escape.
+    - Kiểu trình bày: căn giữa theo chiều ngang, đặt ở vị trí `position` với khoảng cách `margin_y`.
+    - Có nền mờ phía sau chữ (BorderStyle=3) để dễ đọc; đặt box_opacity<=0 để tắt nền.
+    """
+    _ensure_ffmpeg()
+    Path(Path(output_path).parent).mkdir(parents=True, exist_ok=True)
+
+    duration = _probe_duration_sec(video_path)
+    end_time = max(0.0, duration - 0.05)
+
+    start_str = _format_srt_time(0.0)
+    end_str = _format_srt_time(end_time)
+
+    with tempfile.TemporaryDirectory() as td:
+        srt_path = Path(td) / "subtitle.srt"
+        with open(srt_path, "w", encoding="utf-8") as f:
+            f.write("1\n")
+            f.write(f"{start_str} --> {end_str}\n")
+            f.write(text.strip() + "\n")
+
+        if position == "top":
+            alignment = 8  # top-center
+        elif position == "center":
+            alignment = 5  # middle-center
+        else:
+            alignment = 2  # bottom-center
+
+        primary_colour = "&H00FFFFFF"  # trắng, alpha=00 (opaque)
+        use_box = (box_opacity is not None) and (box_opacity > 0)
+        font_name_val = font_name or "DejaVu Sans"
+        if use_box:
+            alpha = max(0, min(255, int(round((1.0 - box_opacity) * 255))))
+            back_colour = f"&H{alpha:02X}000000"  # nền đen với alpha
+            force_style = (
+                f"FontName={font_name_val},FontSize={font_size},Alignment={alignment},"
+                f"PrimaryColour={primary_colour},BackColour={back_colour},BorderStyle=3,"
+                f"Outline=1,Shadow=0,MarginV={margin_y}"
+            )
+        else:
+            # Không nền: dùng BorderStyle=1, tăng Outline để dễ đọc
+            force_style = (
+                f"FontName={font_name_val},FontSize={font_size},Alignment={alignment},"
+                f"PrimaryColour={primary_colour},BorderStyle=1,Outline=2,Shadow=0,MarginV={margin_y}"
+            )
+
+        cmd: List[str] = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            video_path,
+            "-vf",
+            f"subtitles={srt_path}:force_style='{force_style}'",
+            "-c:v",
+            "libx264",
+            "-preset",
+            reencode_preset,
+            "-crf",
+            str(crf),
+            "-c:a",
+            "copy",
+            output_path,
+        ]
+
+        completed = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if completed.returncode != 0:
+            raise RuntimeError(f"ffmpeg burn_subtitle_text thất bại: {completed.stderr}")
+
+    return output_path
+
+# subtitled_video = burn_subtitle_text(
+#             video_path = 'outputs/videos/veo_20251101_011137_0_audio.mp4',
+#             text = "Xin chào",
+#             output_path = 'outputs/videos/veo_20251101_011137_0_sub.mp4',
+#             position = "bottom",
+#             margin_y = 80,
+#             font_name = "DejaVu Sans",
+#             font_size = 20,
+#             box_opacity = 0.0,
+#         )

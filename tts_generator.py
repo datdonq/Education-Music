@@ -83,8 +83,7 @@ def generate_tts(
     *,
     voice_name: str = DEFAULT_VOICE,
     model: str = DEFAULT_TTS_MODEL,
-    output_prefix: str = "tts_output",
-    output_dir: str = "outputs/audio",
+    output_path: str = "outputs/audio/tts_output",
     api_key: Optional[str] = None,
 ) -> List[str]:
     """Sinh audio từ văn bản bằng Google GenAI TTS (streaming).
@@ -140,9 +139,12 @@ def generate_tts(
                         # Khi không đoán được đuôi, ép sang WAV bằng header PCM
                         data_buffer = convert_to_wav(bytes(data_buffer), inline_data.mime_type)
 
-                    filename = f"{output_prefix}_{file_index}{file_ext}"
+                    base = Path(output_path)
+                    dir_path = base.parent if base.name else base
+                    prefix = base.name or "tts_output"
+                    filename = f"{prefix}_{file_index}{file_ext}"
                     file_index += 1
-                    full_path = str(Path(output_dir) / filename)
+                    full_path = str(dir_path / filename)
                     save_binary_file(full_path, bytes(data_buffer))
                     saved_paths.append(full_path)
                 else:

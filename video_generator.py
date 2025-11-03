@@ -27,12 +27,14 @@ def _build_video_config(
     number_of_videos: int = 1,
     duration_seconds: int = 8,
     person_generation: str = "allow_adult",
+    last_image: types.Image = None,
 ) -> types.GenerateVideosConfig:
     """Tạo cấu hình sinh video cho VEO."""
     return types.GenerateVideosConfig(
         aspect_ratio=aspect_ratio,
         number_of_videos=number_of_videos,
         duration_seconds=duration_seconds,
+        last_frame=last_image,
     )
 
 
@@ -41,6 +43,7 @@ def generate_videos(
     output_dir: str = "outputs/videos",
     *,
     images_path: str = None,
+    last_frame_path: str = None,
     model: str = DEFAULT_MODEL,
     poll_interval_sec: int = 10,
     aspect_ratio: str = "16:9",
@@ -58,6 +61,8 @@ def generate_videos(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     if images_path:
         image_bytes = open(images_path, "rb").read()
+    if last_frame_path:
+        last_frame_bytes = open(last_frame_path, "rb").read()
     client = _get_client(api_key)
 
     video_config = _build_video_config(
@@ -65,6 +70,7 @@ def generate_videos(
         number_of_videos=number_of_videos,
         duration_seconds=duration_seconds,
         person_generation=person_generation,
+        last_image= types.Image(image_bytes=last_frame_bytes, mime_type="image/png") if last_frame_path else None,
     )
     last_error: Optional[Exception] = None
     for attempt_index in range(1, max_retries + 1):
@@ -114,4 +120,4 @@ def generate_videos(
     return None
 
 
-#generate_videos(prompt = "a cute creature with snow leopard-like fur is walking in a winter forest.", images_path = "2.jpg")
+#generate_videos(prompt = "'The blue cat-like character is waving cheerfully to the camera. The camera performs a slow zoom-in. The lighting is bright and soft. The background is a simple, uncluttered playroom with some toy blocks.'", images_path = 'outputs/images/image_0.png_0.png', last_frame_path = 'outputs/images/image_1.png_0.png')
