@@ -118,4 +118,5 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
 #         # Cut last frame from video (after subtitle burn)
 #         video_paths.append(video_path[0])
 #     concat_videos(video_paths = video_paths, output_path = "outputs/videos/final.mp4")
-pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "2.jpg")
+if __name__ == "__main__":
+    pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "2.jpg")
