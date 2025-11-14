@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: educational-music-api
+    ports:
+      - "8000:8000"
+    # Nạp biến môi trường từ file .env (nếu có), ví dụ: GEMINI_API_KEY, OPENAI_API_KEY
+    env_file:
+      - .env
+    # Lưu trữ kết quả sinh ra (video/ảnh/audio/uploads) ra ngoài host
+    volumes:
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+
+
