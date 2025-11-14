@@ -35,6 +35,7 @@ def _build_video_config(
         number_of_videos=number_of_videos,
         duration_seconds=duration_seconds,
         last_frame=last_image,
+        person_generation='allow_adult',
     )
 
 

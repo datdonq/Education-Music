@@ -13,7 +13,7 @@ Bạn sẽ nhận được:
 - Mỗi cảnh (scene) có độ dài 8 giây; kịch bản lời thoại cần khớp thời lượng 8 giây (không dài/không ngắn hơn cảm nhận).
 - Nhân vật chính xuất hiện trong mọi cảnh và luôn khớp với ảnh tham chiếu (màu sắc, dáng vẻ, trang phục tổng quát).
 - Tránh chữ/biển hiệu trong khung hình; không chèn text overlay.
-- Không cần mô tả chi tiết vi mô của nhân vật; chỉ mô tả đủ để AI giữ nhất quán theo ảnh tham chiếu.
+- Không được mô tả chi tiết hình ảnh nhân vật; chỉ mô tả đủ để AI giữ nhất quán theo ảnh tham chiếu
 - Tránh thương hiệu, bản quyền, bạo lực, người lớn, hoặc nội dung gây sợ hãi.
 
 # Yêu cầu thị giác và chuyển động (cho hệ sinh video)

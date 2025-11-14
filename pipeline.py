@@ -57,16 +57,18 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
                 output_path=f"outputs/images/image_{scene_index}.png",
             )
             scene_script = scene_item["script"]
-            audio_path = generate_tts(
-                text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
-            )
+
             video_path = generate_videos(
                 prompt=prompt_video + ", Use image reference ", images_path=images[0]
+            )
+            audio_path = generate_tts(
+                text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
             )
             merged_path = video_path[0].replace(".mp4", "_audio.mp4")
             merge_audio_to_video(video_path=video_path[0], audio_path=audio_path[0], output_path=merged_path)
             subtitled_video = burn_subtitle_text(video_path = merged_path, text = scenes[scene_index]["main_content"], output_path = merged_path.replace("_audio.mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
-            return scene_index, subtitled_video
+            last_frame_path = images[1]
+            return scene_index, subtitled_video, last_frame_path
 
         # Chạy song song từng scene với số worker giới hạn để tránh quá tải GPU/CPU
         max_workers = 6
@@ -119,4 +121,4 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
 #         video_paths.append(video_path[0])
 #     concat_videos(video_paths = video_paths, output_path = "outputs/videos/final.mp4")
 if __name__ == "__main__":
-    pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "2.jpg")
+    pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "1.jpg")

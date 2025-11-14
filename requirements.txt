@@ -9,3 +9,4 @@ requests>=2.31.0
 json-repair>=0.14.0
 Pillow>=10.4.0
 opencv-python-headless
+dotenv
