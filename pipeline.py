@@ -4,10 +4,11 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from call_llm import LLMContentGenerator
 from video_generator import generate_videos
+from yescale_video_gen import generate_yescale_video
 from image_generator import generate_images
 from tts_generator import generate_tts
 from video_editor import merge_audio_to_video, concat_videos, burn_subtitle_text, add_background_audio_to_video
-from prompt import SCRIPT_PROMPT
+from prompt import SCRIPT_PROMPT, SCRIPT_PROMPT_VEO3
 import uuid
 from music_generator import generate_music
 def generate_script(summary: str, language: str, images_path: str = None) -> Dict:
@@ -33,7 +34,6 @@ def generate_script(summary: str, language: str, images_path: str = None) -> Dic
             }
         ],
         json=True,
-        media_urls=[images_path],
     )
     return response
 def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
@@ -52,23 +52,22 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
             prompt_image = scene_item["prompt_image"]
             prompt_video = scene_item["prompt_video"]
             images = generate_images(
-                prompt=prompt_image + ", Use image reference ",
+                prompt=prompt_image + ", Use image reference, must not change the image style ",
                 images_path=images_path,
                 output_path=f"outputs/images/image_{scene_index}.png",
             )
-            scene_script = scene_item["script"]
-
-            video_path = generate_videos(
-                prompt=prompt_video + ", Use image reference ", images_path=images[0]
+            #scene_script = scene_item["script"]
+            video_path = f"outputs/videos/video_{uuid.uuid4()}.mp4"
+            generate_yescale_video(
+                prompt=prompt_video + ", Use image reference ", first_image=images[0], output_path=video_path
             )
-            audio_path = generate_tts(
-                text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
-            )
-            merged_path = video_path[0].replace(".mp4", "_audio.mp4")
-            merge_audio_to_video(video_path=video_path[0], audio_path=audio_path[0], output_path=merged_path)
-            subtitled_video = burn_subtitle_text(video_path = merged_path, text = scenes[scene_index]["main_content"], output_path = merged_path.replace("_audio.mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
-            last_frame_path = images[1]
-            return scene_index, subtitled_video, last_frame_path
+            # audio_path = generate_tts(
+            #     text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
+            # )
+            # merged_path = video_path[0].replace(".mp4", "_audio.mp4")
+            # merge_audio_to_video(video_path=video_path[0], audio_path=audio_path[0], output_path=merged_path)
+            subtitled_video = burn_subtitle_text(video_path = video_path, text = scenes[scene_index]["main_content"], output_path = video_path.replace(".mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
+            return scene_index, subtitled_video
 
         # Chạy song song từng scene với số worker giới hạn để tránh quá tải GPU/CPU
         max_workers = 6
