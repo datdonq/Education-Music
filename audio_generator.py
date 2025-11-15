@@ -17,7 +17,7 @@ dotenv.load_dotenv()
 FAL_BASE_URL = os.getenv("FAL_MINIMAX_BASE_URL", "https://api.yescale.io")
 SUBMIT_ENDPOINT = "http://api.yescale.io/fal-ai/minimax/speech-02-hd"
 TASK_ENDPOINT_TEMPLATE = f"{FAL_BASE_URL}/task/{{task_id}}"
-FAL_API_KEY = "sk-zSQ0JP6It3SicTqO6O0j6KQzLiPGND1M4SH7dmGCHjMyTeNg"
+FAL_API_KEY = os.getenv("FAL_API_KEY")
 DEFAULT_VOICE_ID = os.getenv("FAL_MINIMAX_VOICE_ID", "Voice904740431752642196")
 
 

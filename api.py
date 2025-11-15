@@ -14,6 +14,7 @@ def ensure_output_dirs() -> None:
     os.makedirs("outputs/images", exist_ok=True)
     os.makedirs("outputs/audio", exist_ok=True)
     os.makedirs("outputs/uploads", exist_ok=True)
+    os.makedirs("outputs/music", exist_ok=True)
 
 
 ensure_output_dirs()

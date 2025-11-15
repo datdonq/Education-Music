@@ -115,7 +115,7 @@ def generate_yescale_video(
     first_image: Optional[str] = None,
     last_image: Optional[str] = None,
     *,
-    model: str = "veo3-frames",
+    model: str = "veo2-fast-frames",
     enhance_prompt: bool = True,
     poll_interval: int = 5,
     timeout: int = 600,
@@ -201,4 +201,4 @@ def generate_yescale_video(
         time.sleep(poll_interval)
 
 
-generate_yescale_video(prompt = "Chú mèo máy doraemon chào các bạn nhỏ", output_path = "test.mp4", first_image = "2.jpg")
+#generate_yescale_video(prompt = "Chú mèo máy doraemon chào các bạn nhỏ", output_path = "test.mp4", first_image = "1.jpg")

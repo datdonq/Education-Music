@@ -19,6 +19,7 @@ API_KEY = os.getenv("YESCALE_MUSIC_API_KEY")
 
 SUBMIT_ENDPOINT = f"{BASE_URL}/suno/submit/music"
 FETCH_ENDPOINT = f"{BASE_URL}/suno/fetch"
+DEFAULT_OUTPUT_DIR = "outputs/music"
 
 
 class MusicGenerationError(RuntimeError):
@@ -35,13 +36,8 @@ def _build_headers(api_key: str) -> Dict[str, str]:
     }
 
 
-def _download_audio(audio_url: str, output_dir: str, filename: str) -> str:
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    url_name = Path(audio_url.split("?")[0]).name or filename
-    suffix = Path(url_name).suffix or ".mp3"
-    target_path = output_path / f"{filename}{suffix}"
+def _download_audio(audio_url: str, target_path: Path) -> str:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
 
     with requests.get(audio_url, stream=True, timeout=120) as response:
         response.raise_for_status()
@@ -53,13 +49,35 @@ def _download_audio(audio_url: str, output_dir: str, filename: str) -> str:
     return str(target_path.resolve())
 
 
+def _resolve_output_path(
+    audio_url: str, output_path: Optional[str], filename: str
+) -> Path:
+    url_name = Path(audio_url.split("?")[0]).name or filename
+    suffix = Path(url_name).suffix or ".mp3"
+
+    if output_path:
+        candidate = Path(output_path)
+        treat_as_dir = (candidate.exists() and candidate.is_dir()) or not candidate.suffix
+
+        if treat_as_dir:
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate / f"{filename}{suffix}"
+
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        return candidate
+
+    default_dir = Path(DEFAULT_OUTPUT_DIR)
+    default_dir.mkdir(parents=True, exist_ok=True)
+    return default_dir / f"{filename}{suffix}"
+
+
 def generate_music(
     prompt: str,
     *,
     tags: str = "emotional punk",
     mv: str = "chirp-v4",
     title: Optional[str] = None,
-    output_dir: str = "outputs/music",
+    output_path: Optional[str] = None,
     poll_interval: int = 5,
     timeout: int = 600,
 ) -> str:
@@ -71,7 +89,8 @@ def generate_music(
         tags: Thẻ mô tả phong cách (tùy chọn).
         mv: Model version của Suno.
         title: Tiêu đề bài nhạc (nếu None sẽ dùng task_id).
-        output_dir: Thư mục lưu file audio tải về.
+        output_path: Đường dẫn đầu ra (file hoặc thư mục) do người dùng cung cấp.
+            Nếu None, mặc định lưu trong `outputs/music`.
         poll_interval: Khoảng thời gian giữa mỗi lần poll (giây).
         timeout: Tổng thời gian chờ tối đa (giây).
 
@@ -114,7 +133,8 @@ def generate_music(
             if not outputs or not outputs[0].get("audio_url"):
                 raise MusicGenerationError("Không tìm thấy audio_url trong phản hồi.")
             audio_url = outputs[0]["audio_url"]
-            return _download_audio(audio_url, output_dir, filename=task_id)
+            target_path = _resolve_output_path(audio_url, output_path, filename=task_id)
+            return _download_audio(audio_url, target_path)
 
         if status in {"failed", "error"}:
             reason = fetch_data.get("message") or "Không rõ lý do."

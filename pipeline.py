@@ -52,21 +52,21 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
             prompt_image = scene_item["prompt_image"]
             prompt_video = scene_item["prompt_video"]
             images = generate_images(
-                prompt=prompt_image + ", Use image reference, must not change the image style ",
+                prompt=prompt_image + ", Use image reference, must not change the image style or character clothes ",
                 images_path=images_path,
                 output_path=f"outputs/images/image_{scene_index}.png",
             )
-            #scene_script = scene_item["script"]
-            video_path = f"outputs/videos/video_{uuid.uuid4()}.mp4"
+            scene_script = scene_item["script"]
+            video_path = f"outputs/videos/{uuid.uuid4()}.mp4"
             generate_yescale_video(
                 prompt=prompt_video + ", Use image reference ", first_image=images[0], output_path=video_path
             )
-            # audio_path = generate_tts(
-            #     text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
-            # )
-            # merged_path = video_path[0].replace(".mp4", "_audio.mp4")
-            # merge_audio_to_video(video_path=video_path[0], audio_path=audio_path[0], output_path=merged_path)
-            subtitled_video = burn_subtitle_text(video_path = video_path, text = scenes[scene_index]["main_content"], output_path = video_path.replace(".mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
+            audio_path = generate_tts(
+                text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
+            )
+            merged_path = video_path.replace(".mp4", "_audio.mp4")
+            merge_audio_to_video(video_path=video_path, audio_path=audio_path[0], output_path=merged_path)
+            subtitled_video = burn_subtitle_text(video_path = merged_path, text = scenes[scene_index]["main_content"], output_path = video_path.replace(".mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
             return scene_index, subtitled_video
 
         # Chạy song song từng scene với số worker giới hạn để tránh quá tải GPU/CPU
@@ -82,7 +82,8 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
         concat_videos(video_paths = video_paths, output_path = output_path)
         
         # Generate background music
-        background_music_path = generate_music(prompt = music_prompt)
+        background_music_path = f"outputs/music/background_{uuid.uuid4()}.mp3"
+        generate_music(prompt = music_prompt, output_path = background_music_path, timeout = 180)
         add_background_audio_to_video(video_path = output_path, bg_audio_path = background_music_path, output_path = output_path)
         return output_path
     except Exception as e:

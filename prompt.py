@@ -81,7 +81,7 @@ Output JSON schema:
     {
       "prompt_image": "English. First frame visual description. No dialogue.",
       "prompt_video": "English. Motion/camera/lighting/style for 8s và kèm theo script của cảnh được viết bằng tiếng Việt",
-      "main_content": "Thông điệp học tập ngắn gọn (<=80 ký tự)"
+      "main_content": "Thông điệp học tập ngắn gọn (<=50 ký tự)"
     }
     // lặp cho các cảnh tiếp theo
   ],

@@ -1,7 +1,8 @@
+import math
 import os
+import shutil
 import subprocess
 import tempfile
-import shutil
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -116,14 +117,39 @@ def merge_audio_to_video(
 
     - Mặc định copy stream hình ảnh để nhanh (không tái mã hóa). Nếu cần tái mã hóa đặt reencode=True.
     - Có thể dịch audio một khoảng thời gian (audio_offset_sec) và chỉnh âm lượng (volume).
-    - Kết quả sẽ cắt theo track ngắn hơn nhờ -shortest.
+    - Nếu audio dài hơn video, video sẽ tự động lặp lại đến khi audio kết thúc.
+    - Nếu audio ngắn hơn video, tự động chèn đoạn im lặng cho tới hết video.
     """
     _ensure_ffmpeg()
     Path(Path(output_path).parent).mkdir(parents=True, exist_ok=True)
 
+    video_duration = _probe_duration_sec(video_path)
+    audio_duration = _probe_duration_sec(audio_path)
+    if video_duration <= 0:
+        raise RuntimeError("Video phải có duration lớn hơn 0 để thực hiện lặp.")
+    delay_for_duration = audio_offset_sec if audio_offset_sec and audio_offset_sec > 0 else 0.0
+    audio_span = audio_duration + delay_for_duration
+    target_duration = max(video_duration, audio_span)
+    eps = 1e-3
+    need_video_loop = (audio_span - video_duration) > eps
+    need_audio_pad = (target_duration - audio_span) > eps
+    duration_limit = target_duration if need_video_loop else None
+
     cmd: List[str] = [
         "ffmpeg",
         "-y",
+    ]
+
+    stream_loop_count: Optional[int] = None
+    if need_video_loop:
+        loops = max(0, int(math.ceil(target_duration / max(video_duration, eps)) - 1))
+        if loops > 0:
+            stream_loop_count = loops
+
+    if stream_loop_count is not None:
+        cmd += ["-stream_loop", str(stream_loop_count)]
+
+    cmd += [
         "-i",
         video_path,
         "-i",
@@ -131,16 +157,27 @@ def merge_audio_to_video(
     ]
 
     filter_steps: List[str] = []
-    current_label = "[1:a]"  # audio input
+    current_label = "[1:a]"  # audio input (dùng trong filter)
+    final_audio_map = "1:a:0"  # stream để -map
 
     if audio_offset_sec and audio_offset_sec > 0:
         delay_ms = int(audio_offset_sec * 1000)
         filter_steps.append(f"{current_label}adelay={delay_ms}|{delay_ms}[a_del]")
         current_label = "[a_del]"
+        final_audio_map = current_label
 
     if volume is not None:
         filter_steps.append(f"{current_label}volume={volume}[a_vol]")
         current_label = "[a_vol]"
+        final_audio_map = current_label
+
+    if need_audio_pad:
+        filter_steps.append(f"{current_label}apad[a_pad]")
+        current_label = "[a_pad]"
+        final_audio_map = current_label
+        filter_steps.append(f"{current_label}atrim=0:{target_duration:.6f}[a_pad_trim]")
+        current_label = "[a_pad_trim]"
+        final_audio_map = current_label
 
     if filter_steps:
         filter_complex = ";".join(filter_steps)
@@ -150,12 +187,14 @@ def merge_audio_to_video(
             "-map",
             "0:v:0",
             "-map",
-            current_label.strip("[]"),
+            final_audio_map,
         ]
     else:
-        cmd += ["-map", "0:v:0", "-map", "1:a:0"]
+        cmd += ["-map", "0:v:0", "-map", final_audio_map]
 
-    if reencode:
+    effective_reencode = reencode
+
+    if effective_reencode:
         cmd += [
             "-c:v",
             "libx264",
@@ -171,7 +210,10 @@ def merge_audio_to_video(
     else:
         cmd += ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]
 
-    cmd += ["-shortest", output_path]
+    if duration_limit is not None:
+        cmd += ["-t", f"{duration_limit:.6f}"]
+
+    cmd += [output_path]
 
     completed = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if completed.returncode != 0:
@@ -185,7 +227,7 @@ def add_background_audio_to_video(
     bg_audio_path: str,
     output_path: str,
     *,
-    bg_volume: float = 0.5,
+    bg_volume: float = 0.25,
     main_volume: Optional[float] = None,
     bg_offset_sec: float = 0.0,
     loop_bg: bool = True,
@@ -565,3 +607,6 @@ def burn_subtitle_text(
 #             font_size = 20,
 #             box_opacity = 0.0,
 #         )
+
+#add_background_audio_to_video(video_path = 'outputs/videos/5fb9441d-9dbc-41de-a489-ca66eb9ec1e3.mp4', bg_audio_path = "outputs/music/d974610c-d45e-4c25-bac5-db013333235a.mp3", output_path = 'final.mp4')
+#merge_audio_to_video(video_path = 'outputs/videos/5fb9441d-9dbc-41de-a489-ca66eb9ec1e3.mp4', audio_path = "outputs/audio/tts_output_0.wav_0.wav", output_path = 'final.mp4')
