@@ -15,7 +15,7 @@ Bạn sẽ nhận được:
 - Tránh chữ/biển hiệu trong khung hình; không chèn text overlay.
 - Không được mô tả chi tiết hình ảnh nhân vật; chỉ mô tả đủ để AI giữ nhất quán theo ảnh tham chiếu
 - Tránh thương hiệu, bản quyền, bạo lực, người lớn, hoặc nội dung gây sợ hãi.
-
+- Không mô tả chi tiết hình ảnh nhân vật; chỉ dùng từ "character" để mô tả nhân vật.
 # Yêu cầu thị giác và chuyển động (cho hệ sinh video)
 - prompt_image: mô tả khung hình đầu của cảnh (bằng tiếng Anh), rõ ràng, không chứa hội thoại.
 - prompt_video: mô tả chuyển động/video (bằng tiếng Anh), không chứa hội thoại/âm thanh; dùng thì hiện tại tiếp diễn, mô tả 1-2 hành động mượt, camera đơn giản (ví dụ: slight pan/slow zoom), ánh sáng rõ, màu sắc tươi sáng cho thiếu nhi.

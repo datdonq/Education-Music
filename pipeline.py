@@ -6,10 +6,10 @@ from call_llm import LLMContentGenerator
 from video_generator import generate_videos
 from image_generator import generate_images
 from tts_generator import generate_tts
-from video_editor import merge_audio_to_video, concat_videos, burn_subtitle_text
+from video_editor import merge_audio_to_video, concat_videos, burn_subtitle_text, add_background_audio_to_video
 from prompt import SCRIPT_PROMPT
 import uuid
-
+from music_generator import generate_music
 def generate_script(summary: str, language: str, images_path: str = None) -> Dict:
     """
     Sinh kịch bản cho video học tập cho trẻ em
@@ -81,6 +81,10 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
         # Đảm bảo giữ nguyên thứ tự cảnh khi nối video
         video_paths = [path for path in video_paths_by_index if path is not None]
         concat_videos(video_paths = video_paths, output_path = output_path)
+        
+        # Generate background music
+        background_music_path = generate_music(prompt = music_prompt)
+        add_background_audio_to_video(video_path = output_path, bg_audio_path = background_music_path, output_path = output_path)
         return output_path
     except Exception as e:
         print(f"Error: {e}")
@@ -121,4 +125,4 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
 #         video_paths.append(video_path[0])
 #     concat_videos(video_paths = video_paths, output_path = "outputs/videos/final.mp4")
 if __name__ == "__main__":
-    pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "1.jpg")
+    pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "2.jpg")
