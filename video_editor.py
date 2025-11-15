@@ -1,4 +1,3 @@
-import math
 import os
 import shutil
 import subprocess
@@ -117,7 +116,7 @@ def merge_audio_to_video(
 
     - Mặc định copy stream hình ảnh để nhanh (không tái mã hóa). Nếu cần tái mã hóa đặt reencode=True.
     - Có thể dịch audio một khoảng thời gian (audio_offset_sec) và chỉnh âm lượng (volume).
-    - Nếu audio dài hơn video, video sẽ tự động lặp lại đến khi audio kết thúc.
+    - Nếu audio dài hơn video, 3 giây cuối của video sẽ được lặp để kéo dài tới hết audio.
     - Nếu audio ngắn hơn video, tự động chèn đoạn im lặng cho tới hết video.
     """
     _ensure_ffmpeg()
@@ -130,69 +129,68 @@ def merge_audio_to_video(
     delay_for_duration = audio_offset_sec if audio_offset_sec and audio_offset_sec > 0 else 0.0
     audio_span = audio_duration + delay_for_duration
     target_duration = max(video_duration, audio_span)
+    extend_by = max(audio_span - video_duration, 0.0)
     eps = 1e-3
-    need_video_loop = (audio_span - video_duration) > eps
+    need_video_tail_loop = extend_by > eps
     need_audio_pad = (target_duration - audio_span) > eps
-    duration_limit = target_duration if need_video_loop else None
 
     cmd: List[str] = [
         "ffmpeg",
         "-y",
-    ]
-
-    stream_loop_count: Optional[int] = None
-    if need_video_loop:
-        loops = max(0, int(math.ceil(target_duration / max(video_duration, eps)) - 1))
-        if loops > 0:
-            stream_loop_count = loops
-
-    if stream_loop_count is not None:
-        cmd += ["-stream_loop", str(stream_loop_count)]
-
-    cmd += [
         "-i",
         video_path,
         "-i",
         audio_path,
     ]
 
-    filter_steps: List[str] = []
-    current_label = "[1:a]"  # audio input (dùng trong filter)
-    final_audio_map = "1:a:0"  # stream để -map
+    filter_entries: List[str] = []
+    audio_label = "[1:a]"
+    final_audio_map = "1:a:0"
+    final_video_map = "0:v:0"
 
     if audio_offset_sec and audio_offset_sec > 0:
         delay_ms = int(audio_offset_sec * 1000)
-        filter_steps.append(f"{current_label}adelay={delay_ms}|{delay_ms}[a_del]")
-        current_label = "[a_del]"
-        final_audio_map = current_label
+        filter_entries.append(f"{audio_label}adelay={delay_ms}|{delay_ms}[a_del]")
+        audio_label = "[a_del]"
+        final_audio_map = audio_label
 
     if volume is not None:
-        filter_steps.append(f"{current_label}volume={volume}[a_vol]")
-        current_label = "[a_vol]"
-        final_audio_map = current_label
+        filter_entries.append(f"{audio_label}volume={volume}[a_vol]")
+        audio_label = "[a_vol]"
+        final_audio_map = audio_label
 
     if need_audio_pad:
-        filter_steps.append(f"{current_label}apad[a_pad]")
-        current_label = "[a_pad]"
-        final_audio_map = current_label
-        filter_steps.append(f"{current_label}atrim=0:{target_duration:.6f}[a_pad_trim]")
-        current_label = "[a_pad_trim]"
-        final_audio_map = current_label
+        filter_entries.append(f"{audio_label}apad[a_pad]")
+        audio_label = "[a_pad]"
+        final_audio_map = audio_label
+        filter_entries.append(f"{audio_label}atrim=0:{target_duration:.6f}[a_pad_trim]")
+        audio_label = "[a_pad_trim]"
+        final_audio_map = audio_label
 
-    if filter_steps:
-        filter_complex = ";".join(filter_steps)
+    if need_video_tail_loop:
+        tail_start = max(video_duration - 3.0, 0.0)
+        loop_duration = extend_by
+        filter_entries.append("[0:v]split=2[vbase_src][vtail_src]")
+        filter_entries.append("[vbase_src]setpts=PTS-STARTPTS[vbase]")
+        filter_entries.append(f"[vtail_src]trim=start={tail_start:.6f},setpts=PTS-STARTPTS[vtail_trim]")
+        filter_entries.append("[vtail_trim]loop=-1:size=0:start=0[vtail_loop]")
+        filter_entries.append(f"[vtail_loop]trim=0:{loop_duration:.6f},setpts=PTS-STARTPTS[vtail_fill]")
+        filter_entries.append("[vbase][vtail_fill]concat=n=2:v=1:a=0[vout]")
+        final_video_map = "[vout]"
+
+    if filter_entries:
         cmd += [
             "-filter_complex",
-            filter_complex,
+            ";".join(filter_entries),
             "-map",
-            "0:v:0",
+            final_video_map,
             "-map",
             final_audio_map,
         ]
     else:
-        cmd += ["-map", "0:v:0", "-map", final_audio_map]
+        cmd += ["-map", final_video_map, "-map", final_audio_map]
 
-    effective_reencode = reencode
+    effective_reencode = reencode or need_video_tail_loop
 
     if effective_reencode:
         cmd += [
@@ -209,9 +207,6 @@ def merge_audio_to_video(
         ]
     else:
         cmd += ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]
-
-    if duration_limit is not None:
-        cmd += ["-t", f"{duration_limit:.6f}"]
 
     cmd += [output_path]
 
@@ -608,5 +603,5 @@ def burn_subtitle_text(
 #             box_opacity = 0.0,
 #         )
 
-#add_background_audio_to_video(video_path = 'outputs/videos/5fb9441d-9dbc-41de-a489-ca66eb9ec1e3.mp4', bg_audio_path = "outputs/music/d974610c-d45e-4c25-bac5-db013333235a.mp3", output_path = 'final.mp4')
-#merge_audio_to_video(video_path = 'outputs/videos/5fb9441d-9dbc-41de-a489-ca66eb9ec1e3.mp4', audio_path = "outputs/audio/tts_output_0.wav_0.wav", output_path = 'final.mp4')
+#add_background_audio_to_video(video_path = 'outputs/videos/78b15f41-9e4d-49d6-a2ca-757979e04c91.mp4', bg_audio_path = "outputs/music/background_5e48dc95-5801-425a-87f2-d869038aaec8.mp3", output_path = 'final.mp4')
+#merge_audio_to_video(video_path = 'outputs/videos/85c6c669-1f61-4e09-86fb-a58afae18fec.mp4', audio_path = "outputs/audio/tts_output_0.wav_0.wav", output_path = 'final.mp4')
