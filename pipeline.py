@@ -2,15 +2,15 @@ import argparse
 from typing import Dict, List, Optional
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from call_llm import LLMContentGenerator
-from video_generator import generate_videos
-from yescale_video_gen import generate_yescale_video
-from image_generator import generate_images
-from tts_generator import generate_tts
-from video_editor import merge_audio_to_video, concat_videos, burn_subtitle_text, add_background_audio_to_video
-from prompt import SCRIPT_PROMPT, SCRIPT_PROMPT_VEO3
+from gemini_service.call_llm import LLMContentGenerator
+from gemini_service.video_generator import generate_videos
+from yescale_service.yescale_video_gen import generate_yescale_video
+from gemini_service.image_generator import generate_images
+from gemini_service.tts_generator import generate_tts
+from utils.video_editor import merge_audio_to_video, concat_videos, burn_subtitle_text, add_background_audio_to_video
+from utils.prompt import SCRIPT_PROMPT, SCRIPT_PROMPT_VEO3
 import uuid
-from music_generator import generate_music
+from yescale_service.music_generator import generate_music
 def generate_script(summary: str, language: str, images_path: str = None) -> Dict:
     """
     Sinh kịch bản cho video học tập cho trẻ em
@@ -58,12 +58,13 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
             )
             scene_script = scene_item["script"]
             video_path = f"outputs/videos/{uuid.uuid4()}.mp4"
-            generate_yescale_video(
-                prompt=prompt_video + ", Use image reference ", first_image=images[0], output_path=video_path
-            )
             audio_path = generate_tts(
                 text=scene_script, output_path=f"outputs/audio/tts_output_{scene_index}.wav"
             )
+            generate_yescale_video(
+                prompt=prompt_video + ", Use image reference ", first_image=images[0], output_path=video_path
+            )
+            
             merged_path = video_path.replace(".mp4", "_audio.mp4")
             merge_audio_to_video(video_path=video_path, audio_path=audio_path[0], output_path=merged_path)
             subtitled_video = burn_subtitle_text(video_path = merged_path, text = scenes[scene_index]["main_content"], output_path = video_path.replace(".mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
@@ -89,40 +90,6 @@ def pipeline(summary: str, language: str, images_path: str = None) -> Dict:
     except Exception as e:
         print(f"Error: {e}")
         return None
-# def pipeline_last_frame(summary: str, language: str, images_path: str = None) -> Dict:
-#     """
-#     Pipeline sinh kịch bản cho video học tập cho trẻ em
-#     """
-#     script = generate_script(summary = summary, language = language, images_path = images_path)
-#     # Save script to json file
-#     last_script = script
-#     with open("script.json", "w", encoding="utf-8") as f:
-#         json.dump(script, f, ensure_ascii=False)
-#     scenes = script["scence_script"]
-#     music_prompt = script["music_prompt"]
-#     video_paths = []
-#     first_frames_paths = []
-#     audio_paths = []
-#     video_prompts = {}
-#     # Veo2
-#     index = 0
-#     for scene in scenes:
-#         prompt_image = scene["prompt_image"]
-#         images = generate_images(prompt = prompt_image + ", Use image reference ", images_path = images_path, output_path = f"outputs/images/image_{index}.png")
-#         script = scene["script"]
-#         audio_path = generate_tts(text = script, output_path = f"outputs/audio/tts_output_{index}.wav")
-#         first_frames_paths.append(images[0])
-#         audio_paths.append(audio_path[0])
-#         video_prompts[index] = scene["prompt_video"]
-#         index += 1
-#     for index, video_prompt in video_prompts.items():
-#         video_path = generate_videos(prompt = video_prompt + ", Use image reference ", images_path = first_frames_paths[index], last_frame_path = first_frames_paths[index+1] if index+1 < len(first_frames_paths) else None)
-#         # Merge audio and video
-#         merged_video = merge_audio_to_video(video_path = video_path[0], audio_path = audio_paths[index], output_path = video_path[0].replace(".mp4", "_audio.mp4"))
-#         # Burn main_content as subtitle over the whole scene
-#         subtitled_video = burn_subtitle_text(video_path = merged_video, text = scenes[index]["main_content"], output_path = merged_video.replace("_audio.mp4", "_sub.mp4"), position = "bottom", margin_y = 80, font_name = "DejaVu Sans", font_size = 20, box_opacity = 0.0)
-#         # Cut last frame from video (after subtitle burn)
-#         video_paths.append(video_path[0])
-#     concat_videos(video_paths = video_paths, output_path = "outputs/videos/final.mp4")
+
 if __name__ == "__main__":
     pipeline(summary = "Video học tập 4 chữ cái A, B, C, D cho trẻ em", language = "Tiếng Việt", images_path = "2.jpg")

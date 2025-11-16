@@ -194,4 +194,4 @@ def generate_audio(
 
 __all__ = ["generate_audio", "AudioGenerationError"]
 
-generate_audio(script = "Việt nam có đẹp không", output_path = "audio.mp3")
+#generate_audio(script = "Việt nam có đẹp không", output_path = "audio.mp3")
